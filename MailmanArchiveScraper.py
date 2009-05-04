@@ -1,13 +1,13 @@
 """
-* Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents.
-* v1.0, 2009-04-05
+* Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents, with an optional RSS feed.
+* v1.1, 2009-05-04
 * http://github.com/philgyford/mailman-archive-scraper/
 * 
 * Only works with Monthly archives at the moment.
 * Could do with more error checking, especially around loadConfig().
 * Hasn't had a huge amount of testing -- use with care.
 """
-import ClientForm, ConfigParser, email.utils, mechanize, os, re, sys, time, urlparse
+import ClientForm, ConfigParser, datetime, email.utils, mechanize, os, PyRSS2Gen, re, sys, time, urlparse
 from BeautifulSoup import BeautifulSoup
 
 
@@ -16,7 +16,6 @@ class MailmanArchiveScraper:
     Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents.
     """
     
-
     def __init__(self):
         self.loadConfig()
 
@@ -36,8 +35,13 @@ class MailmanArchiveScraper:
         if not os.path.exists(self.publish_dir):
             os.mkdir(self.publish_dir)
             
+        # We'll keep track of how many items (emails) we fetch with this.
+        self.messages_fetched = 0
+        
+        self.prepareRSS()
+        
         self.prepareRegExps()
-            
+        
 
     def loadConfig(self):
         "Loads configuration from the MailmanArchiveScraper.cfg file"
@@ -79,7 +83,14 @@ class MailmanArchiveScraper:
                     self.error("'"+sr+"' is not a valid search_replace string.")
                 self.search_replace[search] = replace
         
+        
+        self.rss_file = config.get('RSS', 'rss_file')
+        self.items_for_rss = int(config.get('RSS', 'items_for_rss'))
+        self.rss_title = config.get('RSS', 'rss_title')
+        self.rss_description = config.get('RSS', 'rss_description')
+        
         self.publish_dir = config.get('Local', 'publish_dir')
+        self.publish_url = config.get('Local', 'publish_url')
         self.hours_to_go_back = int(config.get('Local', 'hours_to_go_back'))
         self.verbose = config.getboolean('Local', 'verbose')
 
@@ -92,44 +103,115 @@ class MailmanArchiveScraper:
         Although the regexps are set here, they might not be used in filterPages(),
         depending on the config settings.
         """
-        
+
         # Remove all standard emails, eg "billy@nomates.com" or "<billy@nomates.com>"
         self.match_email = re.compile(r'\b<?[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}>?\b', re.IGNORECASE)
-        
+
         # Remove all email addresses obscured by Mailman, eg "billy at nomates.com"
         self.match_text_email = re.compile(r'\b[A-Z0-9._%+-]+\sat\s[A-Z0-9.-]+\.[A-Z]{2,4}\b', re.IGNORECASE)
-        
+
         # Remove all mailto: links. Replaces them with '#'
         self.match_mailto = re.compile(r'mailto\:[^"]*', re.IGNORECASE)
-        
+
         # Replace any remaining links to the original list pages with #
         # A bit messy, but just in case.
         # eg, for links to message attachments.
         self.match_list_url = re.compile(r''+self.list_url, re.IGNORECASE)
-        
+
         # Replace the list info url with our custom one from the config
         self.match_list_info_url = re.compile(r'http://' + self.domain + '/mailman/listinfo/' + self.list_name, re.IGNORECASE)
-        
+
         # Matches lines that beging with </I>&gt;<i>
         # With the number of '&gt;' depending on the level of self.strip_quotes.
         if self.strip_quotes > 0:
             min_level_to_strip = self.strip_quotes + 1
             self.match_strip_quotes = re.compile(r'</I>(&gt;){' + str(min_level_to_strip) + ',}<i>\s.*?\n', re.IGNORECASE)
-        
+
         # Prepare a dictionary of regexp => replacement for each of the search_replace terms.
         self.match_search_replace = {}
         for search, replace in self.search_replace.iteritems():
             regexp = re.compile(r''+search, re.IGNORECASE)
             self.match_search_replace[regexp] = replace
-        
+
+        # For inserting custom HTML just before the end of the <head></head> section.
         self.match_head_html = re.compile(r'</head>', re.IGNORECASE)
-        
+
+        # For removing anything before the subject of the message.
+        # Probably something like "[List name]  Subject of the message".
+        self.match_subject = re.compile(r'^(?:\[.*?\]\s+)?', re.IGNORECASE)
+
 
     def scrape(self):
         if not self.public_list:
             self.logIn()
-            
+
         self.scrapeList()
+
+        self.publishRSS()
+        
+    
+    def prepareRSS(self):
+        """Prepare things for the RSS feed."""
+        
+        if self.rss_file == '':
+            # We're not generating an RSS feed.
+            return
+            
+        self.rss = PyRSS2Gen.RSS2(
+            title = self.rss_title,
+            link = self.list_info_url,
+            description = self.rss_description,
+            lastBuildDate = datetime.datetime.now()
+        )
+        
+        # Items will be added in self.scrapeMessage().
+        self.rss_items = []
+    
+    
+    def addRSSItem(self, message_url, message_time, soup):
+        """
+        Add an item to the RSS feed.
+        message_url - The local, newly-published, URL to this item on the web.
+        message_time - The timestamp of when this email was sent.
+        soup - A BeautifulSoup object of the HTML page the message was originally on.
+        """
+
+        if self.rss_file == '':
+            # We're not generating an RSS feed.
+            return
+
+        # Get the subject of the message
+        subject = soup.h1.string
+        # Remove any preliminary "[List name] " stuff.
+        subject = self.match_subject.sub(r'', subject)
+
+        # Body of the message including HTML tags.
+        # (Not used at the moment.)
+        #body_html = str(soup.pre)
+
+        # Body of the message (everything within <pre></pre> tags) with all HTML tags stripped.
+        body_text = ''.join(soup.pre.findAll(text=True))
+
+        # Add this message to the RSS feed.
+        self.rss_items.append(
+         PyRSS2Gen.RSSItem(
+             title = subject,
+             link = message_url,
+             description = self.smartTruncate(body_text, 500),
+             pubDate = datetime.datetime.fromtimestamp(message_time)
+         )
+        )
+    
+    
+    def publishRSS(self):
+        """Publish the accumulated RSS items."""
+
+        if self.rss_file == '':
+            # We're not generating an RSS feed.
+            return
+
+        self.rss.items = self.rss_items
+        self.rss.write_xml(open(self.rss_file, "w"), 'utf-8')
         
         
     def logIn(self):
@@ -170,7 +252,7 @@ class MailmanArchiveScraper:
         filtered_source = self.filterPage(source)
 
         # Save our local copy.
-        # eg /Users/phil/Sites/lists/html/list-name/index.html
+        # eg /Users/phil/Sites/examplesite/html/list-name/index.html
         local_index = open(self.publish_dir + '/index.html', 'w')
         local_index.write(filtered_source)
         local_index.close()
@@ -199,11 +281,11 @@ class MailmanArchiveScraper:
         date is a string of the form '2009-February'
         """
         
-        # eg http://www.mydomain.com/mailman/private/list-name/2009-February
+        # eg http://lists.example.com/mailman/private/list-name/2009-February
         month_url = self.list_url + '/' + date
         
         # Get the directory the month files will be saved in.
-        # eg /Users/phil/Sites/lists/html/list-name/2009-February
+        # eg /Users/phil/Sites/examplesite/html/list-name/2009-February
         url_parts = month_url.split('/')
         month_dir = self.publish_dir + '/' + url_parts[-1]
         if not os.path.exists(month_dir):
@@ -220,16 +302,17 @@ class MailmanArchiveScraper:
         
         # Get all the links to individual message pages.
         keep_fetching = True
-        messages_scraped = 0
+        messages_fetched_this_month = 0
         for a in anchors:
             link = a.get('href', '')
             if link:
                 # Fetch this message's page and save it.
                 # hours will be how many hours ago this message was sent.
                 hours = self.scrapeMessage(urlparse.urljoin(month_url+'/', link))
-                messages_scraped += 1
-                
-                if self.hours_to_go_back > 0 and hours > self.hours_to_go_back:
+                messages_fetched_this_month += 1  # Count just for this month.
+                self.messages_fetched += 1  # Overall count.
+
+                if self.hours_to_go_back > 0 and hours > self.hours_to_go_back and self.messages_fetched >= self.items_for_rss:
                     # We'll send a signal back to scrapeList() that we don't want to get any previous months.
                     keep_fetching = False
                     break
@@ -239,7 +322,7 @@ class MailmanArchiveScraper:
                     
         # Fetch all the non-date index files for this month and save copies.
         # There's been at least one new message, so get new copies of the other index pages.
-        if (messages_scraped == 1 and keep_fetching) or (messages_scraped > 1):
+        if (messages_fetched_this_month == 1 and keep_fetching) or (messages_fetched_this_month > 1):
             for file in ['thread', 'subject', 'author']:
                 source = self.fetchMonthFile(month_url, month_dir, file+'.html')
             
@@ -252,8 +335,8 @@ class MailmanArchiveScraper:
     def fetchMonthFile(self, remote_dir, local_dir, file_name):
         """
         Fetches one of the monthly index pages (date.html, author.html, subject.html, thread.html).
-        remote_dir is like http://www.mydomain.com/mailman/private/list-name/2009-February
-        local_dir is like /Users/phil/Sites/lists/html/list-name/2009-February
+        remote_dir is like http://lists.example.com/mailman/private/list-name/2009-February
+        local_dir is like /Users/phil/Sites/examplesite/html/list-name/2009-February
         file_name is like date.html
         """
         
@@ -263,7 +346,7 @@ class MailmanArchiveScraper:
         filtered_source = self.filterPage(source)
 
         # Save our local copy.
-        # eg /Users/phil/Sites/lists/html/list-name/2009-February/date.html
+        # eg /Users/phil/Sites/examplesite/html/list-name/2009-February/date.html
         local_month = open(local_dir + '/' + file_name, 'w')
         local_month.write(filtered_source)
         local_month.close()
@@ -272,10 +355,10 @@ class MailmanArchiveScraper:
         return source
         
         
-                    
     def scrapeMessage(self, message_url):
         """
-        Fetches the page for a single message and saves it locally. 
+        Fetches the page for a single message and saves it locally.
+        Adds the message to the RSS feed items.
         Returns the number of hours old this message is.
         """
         
@@ -288,22 +371,27 @@ class MailmanArchiveScraper:
         hours_ago = (time.time() - message_time) / 3600
 
         # Remove all the stuff we don't want.
-        source = self.filterPage(source)
-        
-  
+        source = self.filterPage(source)        
           
         # Get the directory the message file is in.
         # It should already have been created in scrapeMonth()
-        # eg http://www.mydomain.com/mailman/private/list-name/2009-February/000042.html
+        # eg http://lists.example.com/mailman/private/list-name/2009-February/000042.html
         url_parts = message_url.split('/')
-        # eg /Users/phil/Sites/lists/html/list-name/2009-February
-        message_dir = self.publish_dir + '/' + url_parts[-2]
+        # eg /Users/phil/Sites/examplesite/html/list-name/2009-February
+        message_dir = self.publish_dir + url_parts[-2]
         
         # Save our local copy.
-        # eg /Users/phil/Sites/lists/html/list-name/2009-February/000042.html
+        # eg /Users/phil/Sites/examplesite/html/list-name/2009-February/000042.html
         local_message = open(message_dir + '/' + url_parts[-1], 'w')
         local_message.write(source)
         local_message.close()
+        
+        # Create the URL for linking to this message from the RSS feed.
+        # eg http://www.example.com/list-name/2009-February/000042.html
+        local_message_url = self.publish_url + url_parts[-2] + '/' + url_parts[-1]
+
+        # Add this message to the RSS feed items...        
+        self.addRSSItem(local_message_url, message_time, soup)
         
         return hours_ago
         
@@ -354,6 +442,14 @@ class MailmanArchiveScraper:
         fp.close()
         
         return source
+
+
+    def smartTruncate(self, content, length=100, suffix='...'):
+        "Truncates a string at a word boundary."
+        if len(content) <= length:
+            return content
+        else:
+            return content[:length].rsplit(' ',1)[0] + suffix
         
         
     def message(self, text):
