@@ -1,6 +1,6 @@
 """
 * Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents, with an optional RSS feed.
-* v1.1, 2009-05-04
+* v1.11, 2009-05-04
 * http://github.com/philgyford/mailman-archive-scraper/
 * 
 * Only works with Monthly archives at the moment.
