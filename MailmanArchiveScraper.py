@@ -1,6 +1,6 @@
 """
 * Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents, with an optional RSS feed.
-* v1.11, 2009-05-04
+* v1.12, 2009-05-04
 * http://github.com/philgyford/mailman-archive-scraper/
 * 
 * Only works with Monthly archives at the moment.
@@ -193,7 +193,11 @@ class MailmanArchiveScraper:
         #body_html = str(soup.pre)
 
         # Body of the message (everything within <pre></pre> tags) with all HTML tags stripped.
-        body_text = 'From: '+sender+'. '+''.join(soup.pre.findAll(text=True))
+        body_text = ''.join(soup.pre.findAll(text=True))
+        if sender:
+            # Just in case sender is empty because the contents have been stripped
+            # by the filtering process.
+            body_text = 'From: '+sender+'. '+ body_text
 
         # Add this message to the RSS feed.
         self.rss_items.append(
@@ -394,8 +398,9 @@ class MailmanArchiveScraper:
         # eg http://www.example.com/list-name/2009-February/000042.html
         local_message_url = self.publish_url + url_parts[-2] + '/' + url_parts[-1]
 
-        # Add this message to the RSS feed items...        
-        self.addRSSItem(local_message_url, message_time, soup)
+        if self.messages_fetched < self.items_for_rss:
+            # Add this message to the RSS feed items...
+            self.addRSSItem(local_message_url, message_time, soup)
         
         return hours_ago
         

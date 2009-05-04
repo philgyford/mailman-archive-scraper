@@ -1,7 +1,7 @@
 # Mailman Archive Scraper
 
 By Phil Gyford <phil@gyford.com>  
-v1.11, 2009-05-04
+v1.12, 2009-05-04
 
 Latest version is available from <http://github.com/philgyford/mailman-archive-scraper/>
 
