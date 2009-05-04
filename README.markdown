@@ -56,4 +56,4 @@ There is help in the configuration file for each setting. The minimum things you
 
 ## What would also be nice:
 
-* Full text of messages in the RSS feed. I couldn't work out how to easily extend PyRSS2Gen to add content:encoded elements to each item. Suggestions for this are very welcome.
+* Full text of messages in the RSS feed. I couldn't work out how to easily extend PyRSS2Gen to add content:encoded or dc:creator elements to each item. Suggestions for this are very welcome.

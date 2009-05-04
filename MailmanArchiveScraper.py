@@ -185,21 +185,24 @@ class MailmanArchiveScraper:
         # Remove any preliminary "[List name] " stuff.
         subject = self.match_subject.sub(r'', subject)
 
+        # Get who this email was from (the first <b> after the <h1>).
+        sender = soup.h1.findNextSibling('b').string
+        
         # Body of the message including HTML tags.
         # (Not used at the moment.)
         #body_html = str(soup.pre)
 
         # Body of the message (everything within <pre></pre> tags) with all HTML tags stripped.
-        body_text = ''.join(soup.pre.findAll(text=True))
+        body_text = 'From: '+sender+'. '+''.join(soup.pre.findAll(text=True))
 
         # Add this message to the RSS feed.
         self.rss_items.append(
-         PyRSS2Gen.RSSItem(
-             title = subject,
-             link = message_url,
-             description = self.smartTruncate(body_text, 500),
-             pubDate = datetime.datetime.fromtimestamp(message_time)
-         )
+            PyRSS2Gen.RSSItem(
+                title = subject,
+                link = message_url,
+                description = self.smartTruncate(body_text, 500),
+                pubDate = datetime.datetime.fromtimestamp(message_time)
+            )
         )
     
     
@@ -363,16 +366,17 @@ class MailmanArchiveScraper:
         """
         
         source = self.fetchPage(message_url)
+
+        # Remove all the stuff we don't want.
+        source = self.filterPage(source)
         
         # Work out how many hours ago this message was.
         soup = BeautifulSoup(source)
+
         # The time is in the first <I></I> after the <H1>.
         message_time = time.mktime(email.utils.parsedate(soup.h1.findNextSibling('i').string))
         hours_ago = (time.time() - message_time) / 3600
 
-        # Remove all the stuff we don't want.
-        source = self.filterPage(source)        
-          
         # Get the directory the message file is in.
         # It should already have been created in scrapeMonth()
         # eg http://lists.example.com/mailman/private/list-name/2009-February/000042.html
