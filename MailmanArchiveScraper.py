@@ -1,6 +1,6 @@
 """
 * Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents, with an optional RSS feed.
-* v1.12, 2009-05-04
+* v1.13, 2010-01-15
 * http://github.com/philgyford/mailman-archive-scraper/
 * 
 * Only works with Monthly archives at the moment.
@@ -9,6 +9,28 @@
 """
 import ClientForm, ConfigParser, datetime, email.utils, mechanize, os, PyRSS2Gen, re, sys, time, urlparse
 from BeautifulSoup import BeautifulSoup
+
+
+class FullRSSItem(PyRSS2Gen.RSSItem):
+    """
+    Extending the basic RSSItem class in order to allow for an extra 'content:encoded' element.
+    This should be passed in to the class in the initial dictionary keyed with 'content'.
+    The text can be HTML.
+    """
+    
+    def __init__(self, **kwargs):
+        if 'content' in kwargs:
+            self.content = kwargs['content']
+            del kwargs['content']
+        else:
+            self.content = None
+        PyRSS2Gen.RSSItem.__init__(self, **kwargs)
+
+
+    def publish_extensions(self, handler):
+        # handler.startElement("content:encoded")
+        # handler.endElement("content:encoded")
+        PyRSS2Gen._opt_element(handler, "content:encoded", self.content)
 
 
 class MailmanArchiveScraper:
@@ -108,10 +130,20 @@ class MailmanArchiveScraper:
         self.match_email = re.compile(r'\b<?[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}>?\b', re.IGNORECASE)
 
         # Remove all email addresses obscured by Mailman, eg "billy at nomates.com"
-        self.match_text_email = re.compile(r'\b[A-Z0-9._%+-]+\sat\s[A-Z0-9.-]+\.[A-Z]{2,4}\b', re.IGNORECASE)
+        self.match_text_email = re.compile(r"""
+            (&lt;)?                     # Optional &lt;
+            <A\sHREF\="[^>]*?>         # <A HREF="...">
+            [A-Z0-9._%+-]+              # The name part of an email address
+            \sat\s
+            [A-Z0-9.-]+\.[A-Z]{2,4}     # Domain and TLD of an email address
+            \s*?<\/A>
+            (&gt;)?                     # Optional &gt;
+            """, re.IGNORECASE | re.VERBOSE | re.MULTILINE)
 
-        # Remove all mailto: links. Replaces them with '#'
-        self.match_mailto = re.compile(r'mailto\:[^"]*', re.IGNORECASE)
+        # Remove all mailto: links.
+        self.match_mailto = re.compile(r'<A\sHREF\="mailto\:[^>]*?>([^<]*?)</A>', re.IGNORECASE | re.MULTILINE)
+        # A bit that's left over
+        self.match_mailto_label = re.compile(r'\[mailto\:\]')
 
         # Replace any remaining links to the original list pages with #
         # A bit messy, but just in case.
@@ -164,6 +196,8 @@ class MailmanArchiveScraper:
             lastBuildDate = datetime.datetime.now()
         )
         
+        self.rss.rss_attrs['xmlns:content'] = 'http://purl.org/rss/1.0/modules/content/'
+        
         # Items will be added in self.scrapeMessage().
         self.rss_items = []
     
@@ -188,24 +222,38 @@ class MailmanArchiveScraper:
         # Get who this email was from (the first <b> after the <h1>).
         sender = soup.h1.findNextSibling('b').string
         
-        # Body of the message including HTML tags.
-        # (Not used at the moment.)
-        #body_html = str(soup.pre)
-
         # Body of the message (everything within <pre></pre> tags) with all HTML tags stripped.
         body_text = ''.join(soup.pre.findAll(text=True))
+        
+        # Body of the message including HTML tags.
+        #body_html = str(soup.pre.contents[0]).replace("\n", "<br />\n")
+        body_html = ''.join(soup.pre.findAll(text=True)).replace("\n", "<br />\n")
         if sender:
             # Just in case sender is empty because the contents have been stripped
             # by the filtering process.
             body_text = 'From: '+sender+'. '+ body_text
+            
+            # Add some introductory text to the HTML version.
+            body_html = """
+<div class="email-meta">
+    <strong>From:</strong> %s<br />
+    <strong>Subject:</strong> %s<br />
+    <strong>Date:</strong> %s
+</div><br />
+%s
+"""  % (sender, 
+        subject, 
+        datetime.datetime.fromtimestamp(message_time).strftime('%d %B %Y, %H:%M'), 
+        body_html) 
 
         # Add this message to the RSS feed.
         self.rss_items.append(
-            PyRSS2Gen.RSSItem(
-                title = subject,
+            FullRSSItem(
+                title = sender + ' > ' + subject,
                 link = message_url,
                 description = self.smartTruncate(body_text, 500),
-                pubDate = datetime.datetime.fromtimestamp(message_time)
+                pubDate = datetime.datetime.fromtimestamp(message_time),
+                content = body_html
             )
         )
     
@@ -420,7 +468,8 @@ class MailmanArchiveScraper:
             source = self.match_text_email.sub(r'', source)
             
             # Remove all mailto: links. Replaces them with '#'
-            source = self.match_mailto.sub(r'#', source)
+            source = self.match_mailto.sub(r'\1', source)
+            source = self.match_mailto_label.sub(r'', source)
         
         # Replace any remaining links to the original list pages with #
         # A bit messy, but just in case.
