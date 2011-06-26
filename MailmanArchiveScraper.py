@@ -49,9 +49,9 @@ class MailmanArchiveScraper:
 
         # Set the URL for all the archive's pages.
         if self.public_list:
-            self.list_url = 'http://' + self.domain + '/pipermail/' + self.list_name
+            self.list_url = self.protocol + '://' + self.domain + '/pipermail/' + self.list_name
         else:
-            self.list_url = 'http://' + self.domain + '/mailman/private/' + self.list_name
+            self.list_url = self.protocol + '://' + self.domain + '/mailman/private/' + self.list_name
 
         # Make the directory in which we'll save all the files on the local machine.
         if not os.path.exists(self.publish_dir):
@@ -68,7 +68,7 @@ class MailmanArchiveScraper:
     def loadConfig(self):
         "Loads configuration from the MailmanArchiveScraper.cfg file"
         config_file = sys.path[0]+'/MailmanArchiveScraper.cfg'
-        config = ConfigParser.SafeConfigParser()
+        config = ConfigParser.SafeConfigParser({'protocol': 'http'})
         
         try:
             config.readfp(open(config_file))
@@ -79,6 +79,7 @@ class MailmanArchiveScraper:
 
         self.password = config.get('Mailman', 'password')
         self.domain = config.get('Mailman', 'domain')
+        self.protocol = config.get('Mailman', 'protocol')
                 
         self.list_name = config.get('Mailman', 'list_name')
         
@@ -151,7 +152,7 @@ class MailmanArchiveScraper:
         self.match_list_url = re.compile(r''+self.list_url, re.IGNORECASE)
 
         # Replace the list info url with our custom one from the config
-        self.match_list_info_url = re.compile(r'http://' + self.domain + '/mailman/listinfo/' + self.list_name, re.IGNORECASE)
+        self.match_list_info_url = re.compile(self.protocol + '://' + self.domain + '/mailman/listinfo/' + self.list_name, re.IGNORECASE)
 
         # Matches lines that beging with </I>&gt;<i>
         # With the number of '&gt;' depending on the level of self.strip_quotes.
