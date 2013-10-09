@@ -33,7 +33,7 @@ class FullRSSItem(PyRSS2Gen.RSSItem):
         PyRSS2Gen._opt_element(handler, "content:encoded", self.content)
 
 
-class MailmanArchiveScraper:
+class MailmanArchiveScraper(object):
     """
     Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents.
     """
