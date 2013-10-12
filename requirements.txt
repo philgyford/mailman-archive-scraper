@@ -1,0 +1,4 @@
+BeautifulSoup==3.2.1
+ClientForm==0.2.10
+PyRSS2Gen==1.1
+mechanize==0.2.5
