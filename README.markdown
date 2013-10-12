@@ -40,6 +40,7 @@ This script doesn't store any state locally between sessions so every time it's 
 	* ClientForm <http://wwwsearch.sourceforge.net/ClientForm/>
 	* Mechanize <http://wwwsearch.sourceforge.net/mechanize/>
 	* PyRSS2Gen <http://www.dalkescientific.com/Python/PyRSS2Gen.html>
+   Best done with [pip](https://pypi.python.org/pypi/pip) and `pip install -r requirements.txt`.
 5. Make sure the MailmanArchiveScraper.py script is executable (chmod +x).
 
 
