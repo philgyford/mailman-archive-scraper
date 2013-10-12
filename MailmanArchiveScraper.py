@@ -1,6 +1,6 @@
 """
 * Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents, with an optional RSS feed.
-* v1.13, 2010-01-15
+* v1.2, 2013-10-12
 * http://github.com/philgyford/mailman-archive-scraper/
 * 
 * Only works with Monthly archives at the moment.
@@ -33,7 +33,7 @@ class FullRSSItem(PyRSS2Gen.RSSItem):
         PyRSS2Gen._opt_element(handler, "content:encoded", self.content)
 
 
-class MailmanArchiveScraper:
+class MailmanArchiveScraper(object):
     """
     Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents.
     """
