@@ -317,10 +317,12 @@ class MailmanArchiveScraper(object):
         
         # Go through each row in the table except the first (which is column headers).
         for row in soup.first('table')('tr')[1:]:
-            # Get the text in the first column: "February 2009:"
-            (month, year) = row('td')[0].string.split()
-            # Strip the colon off.
-            year = year[:-1]
+            # Get the text in the first column
+            # ("February 2009:" or "February 2009 :")
+            td = row('td')[0].string
+            # Strip the colon (and optional space) off.
+            td = td[:-1].strip()
+            (month, year) = td.split()
 
             # Scrape the date page for this month and get all its messages.
             # keep_fetching will be True or False, depending on whether we need to keep getting older months.
