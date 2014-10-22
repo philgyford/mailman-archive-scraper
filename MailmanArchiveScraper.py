@@ -429,7 +429,8 @@ class MailmanArchiveScraper(object):
         soup = BeautifulSoup(source)
 
         # The time is in the first <I></I> after the <H1>.
-        message_time = time.mktime(email.utils.parsedate(soup.h1.findNextSibling('i').string))
+        parsed_date = self.parseDateString(soup.h1.findNextSibling('i').string)
+        message_time = time.mktime(parsed_date)
         hours_ago = (time.time() - message_time) / 3600
 
         # Get the directory the message file is in.
@@ -454,8 +455,82 @@ class MailmanArchiveScraper(object):
             self.addRSSItem(local_message_url, message_time, soup)
         
         return hours_ago
-        
-        
+
+    def parseDateString(self, date_string):
+        """
+        Takes a date string and tries to parse it into a 9-tuple.
+        eg, 'Mon Oct 22 20:13:11 CEST 2014' becomes
+        (2014, 10, 22, 20, 13, 11, 0, 1, -1)
+
+        If we don't get a result, it might be because the string isn't in
+        English, so we try and translate it.
+        """
+
+        date_tuple = email.utils.parsedate(date_string)
+
+        if date_tuple is not None:
+            # The date appears to be in English, phew, we're done.
+            return date_tuple
+        else:
+            # Can't parse the date. Let's try translating it.
+            # We need to try replacing the day and month strings and see if
+            # we can then parse the string.
+            # This has the potential to go very wrong, but best I can come up
+            # with at the moment.
+            translations = {
+                # For each language, a dict of days and months, mapping the
+                # non-english language strings to English equivalents.
+                'es': {
+                    'days': {'Lun':'Mon', 'Mar':'Tue', 'Mie':'Wed',
+                        'Jue':'Thu', 'Vie':'Fri', 'Sab':'Sat', 'Dom':'Sun'},
+                    'months': {'Ene':'Jan', 'Feb':'Feb', 'Mar':'Mar',
+                                'Abr':'Apr', 'Mayo':'May', 'Jun':'Jun',
+                                'Jul':'Jul', 'Ago':'Aug', 'Sep':'Sep',
+                                'Oct':'Oct', 'Nov':'Nov', 'Dic':'Dec'}
+                },
+                'fr': {
+                    'days': {'Lun':'Mon', 'Mar':'Tue', 'Mer':'Wed',
+                        'Jeu':'Thu', 'Ven':'Fri', 'Sam':'Sat', 'Dim':'Sun'},
+                    'months': {'Jan':'Jan', u'Fév':'Feb', 'Mar':'Mar',
+                                'Avr':'Apr', 'Mai':'May', 'Juin':'Jun',
+                                'Juil':'Jul', 'Aou':'Aug', 'Sep':'Sep',
+                                'Oct':'Oct', 'Nov':'Nov', u'Déc':'Dec'}
+                }
+            }
+
+            for country, replacements in translations.iteritems():
+                # Try matching and replacing the day string.
+                translated_date = self.multipleReplace(
+                                    date_string, replacements['days'], '^', '')
+                # Try matching and replacing the month string.
+                translated_date = self.multipleReplace(
+                        translated_date, replacements['months'], '\\b', '\\b')
+                # Is it now a parseable English date?
+                date_tuple = email.utils.parsedate(translated_date)
+                if date_tuple is not None:
+                    break
+
+            # If it's still None here, we're in trouble. We tried.
+            return date_tuple
+
+    def multipleReplace(self, text, terms, start='', end=''):
+        """
+        Given a string (text) and a dict of search/replace strings, perform
+        the replacements.
+        terms is like {'Lun':'Mon', 'Mar':Tue', 'Mie':'Wed'}
+        start and end are positioned at the start and end of the regex.
+        eg, if start is '^' and end is '\\b' then the regex will be like:
+            "^(Lun|Mar|Mie)\b"
+        Note that we have to double backslash any backslashed characters.
+        """
+
+        regex = re.compile("%s(%s)%s" % (
+                                        start,
+                                        "|".join(map(re.escape, terms.keys())),
+                                        end
+                                    ))
+        return regex.sub(lambda mo: terms[mo.string[mo.start():mo.end()]], text)
+
     def filterPage(self, source):
         "Does all the filtering, removing email addresses, removing quoted portions, etc."
 
