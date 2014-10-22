@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from BeautifulSoup import BeautifulSoup
 from MailmanArchiveScraper import MailmanArchiveScraper

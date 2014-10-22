@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 * Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents, with an optional RSS feed.
 * v1.2, 2013-10-12
