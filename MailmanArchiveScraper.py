@@ -501,7 +501,7 @@ class MailmanArchiveScraper(object):
             for country, replacements in translations.iteritems():
                 # Try matching and replacing the day string.
                 translated_date = self.multipleReplace(
-                                    date_string, replacements['days'], '^', '')
+                                date_string, replacements['days'], '^', '\\b')
                 # Try matching and replacing the month string.
                 translated_date = self.multipleReplace(
                         translated_date, replacements['months'], '\\b', '\\b')
