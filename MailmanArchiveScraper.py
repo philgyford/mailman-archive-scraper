@@ -322,18 +322,49 @@ class MailmanArchiveScraper(object):
             # '2014-October/thread.html':
             month_link = row('td')[1].first('a').get('href')
             # Then get the '2014' and 'October' from that.
-            (year, month) = month_link.split('/')[0].split('-')
+            date_parts = month_link.split('/')[0].split('-')
 
-            # Scrape the date page for this month and get all its messages.
-            # keep_fetching will be True or False, depending on whether we need to keep getting older months.
-            keep_fetching = self.scrapeMonth(year+'-'+month)
+            if len(date_parts) == 1:
+                # Uhoh, we don't have a year and month. Sometimes Mailman seems
+                # to make yearly archives too, in which case we'll just have a
+                # year.
+                keep_fetching = self.scrapeYearIndexes(date_parts[0])
+            else:
+                (year, month) = date_parts
+                # Scrape the date page for this month and get all its messages.
+                # keep_fetching will be True or False, depending on whether we
+                # need to keep getting older months.
+                keep_fetching = self.scrapeMonthIndexes(year+'-'+month)
+
             
             if not keep_fetching:
                 break;
+
         
+    def scrapeYearIndexes(self, year):
+        """
+        Sometimes there are year-based index pages, as well as months.
+        For completeness, we'll save those if we come across them, but we don't
+        go through and get all their messages too, as that would duplicate the
+        work of the monthly scraping.
+        """
+        year_url = self.list_url + '/' + year
         
+        url_parts = year_url.split('/')
+        year_dir = self.publish_dir + '/' + url_parts[-1]
+        if not os.path.exists(year_dir):
+            os.mkdir(year_dir)
+
+        for file in ['date', 'thread', 'subject', 'author']:
+            source = self.fetchIndexFile(year_url, year_dir, file+'.html')
         
-    def scrapeMonth(self, date):
+        # Get the gzipped file.
+        source = self.fetchIndexFile(self.list_url, self.publish_dir, year+'.txt.gz')
+
+        return True
+
+
+    def scrapeMonthIndexes(self, date):
         """
         Scrapes a monthly archive date page and follows through to all the messages listed
         date is a string of the form '2009-February'
@@ -349,7 +380,7 @@ class MailmanArchiveScraper(object):
         if not os.path.exists(month_dir):
             os.mkdir(month_dir)
 
-        source = self.fetchMonthFile(month_url, month_dir, 'date.html')
+        source = self.fetchIndexFile(month_url, month_dir, 'date.html')
         
         # This will be the source of the date.html page for this month.
         soup = BeautifulSoup(source)
@@ -382,20 +413,24 @@ class MailmanArchiveScraper(object):
         # There's been at least one new message, so get new copies of the other index pages.
         if (messages_fetched_this_month == 1 and keep_fetching) or (messages_fetched_this_month > 1):
             for file in ['thread', 'subject', 'author']:
-                source = self.fetchMonthFile(month_url, month_dir, file+'.html')
+                source = self.fetchIndexFile(month_url, month_dir, file+'.html')
             
             # Get the gzipped file.
-            source = self.fetchMonthFile(self.list_url, self.publish_dir, date+'.txt.gz')
+            source = self.fetchIndexFile(self.list_url, self.publish_dir, date+'.txt.gz')
 
         return keep_fetching
         
         
-    def fetchMonthFile(self, remote_dir, local_dir, file_name):
+    def fetchIndexFile(self, remote_dir, local_dir, file_name):
         """
-        Fetches one of the monthly index pages (date.html, author.html, subject.html, thread.html).
-        remote_dir is like http://lists.example.com/mailman/private/list-name/2009-February
-        local_dir is like /Users/phil/Sites/examplesite/html/list-name/2009-February
-        file_name is like date.html
+        Fetches one of the monthly or yearly index pages (date.html,
+        author.html, subject.html, thread.html).
+        remote_dir is like
+            http://lists.example.com/mailman/private/list-name/2009-February
+        local_dir is like
+            /Users/phil/Sites/examplesite/html/list-name/2009-February
+        file_name is like
+            date.html
         """
         
         source = self.fetchPage(remote_dir+'/' + file_name)
@@ -471,7 +506,7 @@ class MailmanArchiveScraper(object):
         hours_ago = (time.time() - message_time) / 3600
 
         # Get the directory the message file is in.
-        # It should already have been created in scrapeMonth()
+        # It should already have been created in scrapeMonthIndexes()
         # eg /Users/phil/Sites/examplesite/html/list-name/2009-February
         message_dir = self.publish_dir + url_parts[-2]
         
