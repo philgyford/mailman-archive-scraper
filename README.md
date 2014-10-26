@@ -1,7 +1,7 @@
 # Mailman Archive Scraper
 
 By Phil Gyford <phil@gyford.com>  
-v1.2, 2013-10-12
+v1.3, 2014-10-26
 
 Latest version is available from <http://github.com/philgyford/mailman-archive-scraper/>
 
@@ -80,9 +80,29 @@ After an initial run, you can run the script via cron to keep an updated copy of
 * Sending each message on as an email. I can't see how to do this simply, given that we retain no state between times the script is run, so can't tell which emails haven't previously been sent.
 
 
-##Contributors
+## Contributors
 
 Many thanks to:
 
 * [CyberRodent](https://github.com/cyberrodent) for the text/gzip file archiving.
+* [Danny O'Brien](https://github.com/dannyob) for https support.
 
+
+## Version history
+
+See all versions: https://github.com/philgyford/mailman-archive-scraper/releases
+
+* v1.3 2014-10-26
+  Add support for non-English language installations.
+* v1.2 2013-10-12
+  The monthly text files, possibly gzipped, can be archived using a new script.
+* v1.13b 2013-10-12
+  The script can now archive files served over https.
+* v1.13 2013-10-12
+  Various improvements to the RSS files generated.
+* v1.12 2013-10-10
+  The script can now generate an RSS feed of the most recent posts to the mailing list.
+* v1.0 2013-10-12
+  Initial release
+
+  
