@@ -1,7 +1,7 @@
 # Mailman Archive Scraper
 
 By Phil Gyford <phil@gyford.com>  
-v1.3, 2014-10-26
+v1.4, 2015-03-15
 
 Latest version is available from <http://github.com/philgyford/mailman-archive-scraper/>
 
@@ -59,6 +59,8 @@ There is help in the configuration file for each setting. The minimum things you
 4. `publish_dir` -- The path to the local directory the files should be republished to.
 5. `publish_url` -- If you're going to publish the messages to a website.
 
+By default the script uses a single `MailmanArchiveScraper.cfg` file in the same directory as the script, but you can specify multiple files, in different locations, instead (see Usage).
+
 
 ## Usage
 
@@ -74,6 +76,12 @@ If you want to download the plaintext files that Mailman saves for each month's 
 
 After an initial run, you can run the script via cron to keep an updated copy of the HTML and/or text files. Note the `hours_to_go_back` setting in the config file, which wil probably need to be different for the first run compared to subsequent, regular runs.
 
+By default the script runs once, using `MailmanArchiveScraper.cfg`. You can specify multiple config files and the script will run once for each file. For example, run the script with:
+
+	$ python ./MailmanArchiveScraper.py ~/lists/*.cfg
+
+and the script will run once for each of the `*.cfg` files found in the `~/lists/` directory.
+
 
 ## What would also be nice:
 
@@ -86,11 +94,15 @@ Many thanks to:
 
 * [CyberRodent](https://github.com/cyberrodent) for the text/gzip file archiving.
 * [Danny O'Brien](https://github.com/dannyob) for https support.
+* [Andrew Bibby](https://github.com/bibby) for supporting multiple config files.
 
 
 ## Version history
 
 See all versions: https://github.com/philgyford/mailman-archive-scraper/releases
+
+* **v1.4** 2015-03-15
+  Multiple config files can be specified.
 
 * **v1.3** 2014-10-26  
   Add support for non-English language installations.
