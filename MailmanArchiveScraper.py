@@ -39,8 +39,8 @@ class MailmanArchiveScraper(object):
     Scrapes the archive pages of one or more lists in a Mailman installation and republishes the contents.
     """
     
-    def __init__(self):
-        self.loadConfig()
+    def __init__(self, config_file=None):
+        self.loadConfig(config_file)
 
         # We need to know if this is a public or private list.
         # We assume it's public if there's no username set.
@@ -66,9 +66,9 @@ class MailmanArchiveScraper(object):
         self.prepareRegExps()
         
 
-    def loadConfig(self):
+    def loadConfig(self, config_file=None):
         "Loads configuration from the MailmanArchiveScraper.cfg file"
-        config_file = sys.path[0]+'/MailmanArchiveScraper.cfg'
+        config_file = config_file or os.path.realpath(os.path.dirname(__file__) + '/MailmanArchiveScraper.cfg')
         config = ConfigParser.SafeConfigParser({'protocol': 'http'})
         
         try:
@@ -593,13 +593,19 @@ class MailmanArchiveScraper(object):
         if fatal:
             exit()
 
-def main():
-    scraper = MailmanArchiveScraper()
-    
-    scraper.scrape()
+def main(configs=None):
+    # absent any config files, use the built-in default indicated by None
+    configs = configs or [None]
+    for config_file in configs:
+        scraper = MailmanArchiveScraper(config_file=config_file)
+        scraper.scrape()
 
 
 if __name__ == "__main__":
-    main()
+    configs = None
+    if len(sys.argv) > 1:
+        configs = [f for f in map(os.path.realpath, set(sys.argv[1:])) if os.path.isfile(f)]
+
+    main(configs)
     
 
