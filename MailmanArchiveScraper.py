@@ -576,7 +576,7 @@ class MailmanArchiveScraper(object):
             fp = mechanize.urlopen(url)
             source = fp.read()
         except HTTPError as e:
-            self.error("Failed to fetch " + e.filename + ", HTTP status " + str(e.code))
+            self.error("Failed to fetch " + e.filename + ", HTTP status " + str(e.code), fatal=False)
             return None
         finally:
             if fp:
