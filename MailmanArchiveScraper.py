@@ -8,8 +8,10 @@
 * Could do with more error checking, especially around loadConfig().
 * Hasn't had a huge amount of testing -- use with care.
 """
+from urllib2 import HTTPError
 import ClientForm, ConfigParser, datetime, email.utils, mechanize, os, PyRSS2Gen, re, sys, time, urlparse
 from BeautifulSoup import BeautifulSoup
+import errno
 
 
 class FullRSSItem(PyRSS2Gen.RSSItem):
@@ -56,7 +58,7 @@ class MailmanArchiveScraper(object):
 
         # Make the directory in which we'll save all the files on the local machine.
         if not os.path.exists(self.publish_dir):
-            os.mkdir(self.publish_dir)
+            mkdir_p(self.publish_dir)
             
         # We'll keep track of how many items (emails) we fetch with this.
         self.messages_fetched = 0
@@ -434,6 +436,8 @@ class MailmanArchiveScraper(object):
         """
         
         source = self.fetchPage(remote_dir+'/' + file_name)
+        if not source:
+            return None
 
         # The copy of the page we save is filtered for email addresses, links, etc.
         filtered_source = self.filterPage(source)
@@ -567,10 +571,16 @@ class MailmanArchiveScraper(object):
         "Used for fetching all the remote pages."
         
         self.message("Fetching " + url)
-        
-        fp = mechanize.urlopen(url)
-        source = fp.read()
-        fp.close()
+        fp = None
+        try:
+            fp = mechanize.urlopen(url)
+            source = fp.read()
+        except HTTPError as e:
+            self.error("Failed to fetch " + e.filename + ", HTTP status " + str(e.code))
+            return None
+        finally:
+            if fp:
+                fp.close()
         
         return source
 
@@ -589,7 +599,7 @@ class MailmanArchiveScraper(object):
             print text
             
     def error(self, text, fatal=True):
-        print text
+        print >> sys.stderr, text
         if fatal:
             exit()
 
@@ -600,6 +610,14 @@ def main(configs=None):
         scraper = MailmanArchiveScraper(config_file=config_file)
         scraper.scrape()
 
+def mkdir_p(path):
+    """Recursive mkdir : http://stackoverflow.com/a/600612/4529725 """
+    try:
+        os.makedirs(path)
+    except OSError as exc: # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else: raise
 
 if __name__ == "__main__":
     configs = None
