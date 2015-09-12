@@ -1,7 +1,7 @@
 # Mailman Archive Scraper
 
 By Phil Gyford <phil@gyford.com>  
-v1.4, 2015-03-15
+v1.4.1, 2015-09-12
 
 Latest version is available from <http://github.com/philgyford/mailman-archive-scraper/>
 
@@ -27,7 +27,7 @@ There may be more efficient ways to do this if you have access to the database i
 
 This script doesn't store any state locally between sessions so every time it's run it will have to scrape several pages, even if nothing's changed (particularly if you want an RSS feed of n recent messages). There is a half second delay between each fetch of a remote page, which slows things up but will hopefully prevent hammering web servers.
 
-**There are caveats.** I have only tested this with a couple of Mailman archives (one private, one public) and it seems to work fine. I'm sure that some people will find problems with different installations -- unscrapeable HTML, different URLs and filepaths, etc. Feel free to suggest fixes.
+**There are caveats.** This seems to work with the few Mailman archives tried. I'm sure that some people will find problems with different installations -- unscrapeable HTML, different URLs and filepaths, etc. Feel free to suggest fixes.
 
 
 ## Installation
@@ -38,13 +38,9 @@ This script doesn't store any state locally between sessions so every time it's 
 
 3. Set the configuration options in that file (see below).
 
-4. Install the required extra python modules:
-	* BeautifulSoup <http://www.crummy.com/software/BeautifulSoup/>
-	* ClientForm <http://wwwsearch.sourceforge.net/ClientForm/>
-	* Mechanize <http://wwwsearch.sourceforge.net/mechanize/>
-	* PyRSS2Gen <http://www.dalkescientific.com/Python/PyRSS2Gen.html>
+4. Install the required python modules, best done using [pip](https://pypi.python.org/pypi/pip):
 
-   Best done with [pip](https://pypi.python.org/pypi/pip) and `pip install -r requirements.txt`.
+	$ pip install -r requirements.txt
 
 5. Make sure the `MailmanArchiveScraper.py` script is executable (`chmod +x`). And the `MailmanGzTextScraper.py` script if you need that too.
 
@@ -94,12 +90,15 @@ Many thanks to:
 
 * [CyberRodent](https://github.com/cyberrodent) for the text/gzip file archiving.
 * [Danny O'Brien](https://github.com/dannyob) for https support.
-* [Andrew Bibby](https://github.com/bibby) for supporting multiple config files.
+* [Andrew Bibby](https://github.com/bibby) for supporting multiple config files, and better handling missing gzip archives.
 
 
 ## Version history
 
 See all versions: https://github.com/philgyford/mailman-archive-scraper/releases
+
+* **v1.4.1** 2015-09-12
+  Better handle missing gzip archives.
 
 * **v1.4** 2015-03-15
   Multiple config files can be specified.
