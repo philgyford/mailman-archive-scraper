@@ -123,4 +123,4 @@ See all versions: https://github.com/philgyford/mailman-archive-scraper/releases
 
   
 ## Similar projects
-- python - [doc_curation](https://github.com/sanskrit-coders/doc_curation/blob/e97fa9b06c462f66c91535ad3f99131c5b580149/doc_curation/mail_stream/mailman.py) dumps emails to markdown files organized by year/month/subject
+- python - [doc_curation](https://github.com/sanskrit-coders/doc_curation/blob/master/doc_curation/mail_stream/mailman.py) dumps emails to markdown files organized by year/month/subject.
